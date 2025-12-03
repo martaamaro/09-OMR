@@ -44,9 +44,7 @@ import matplotlib.pyplot as plt
 import smogn
 
 # load data
-housing = pd.read_csv(
-    r"C:\Users\marta\OneDrive - Universiteit Utrecht\Desktop\UU-MASTER\Year 1 - Semester 1\OMR\Project II\smogn\data\housing.csv"
-)
+housing = pd.read_csv("data/housing.csv")
 y_col = "SalePrice"
 housing_clean = housing.dropna()
 y_emp = housing[y_col]
