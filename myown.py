@@ -1,3 +1,8 @@
+
+
+
+#%%
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import smogn
@@ -80,7 +85,7 @@ plt.tight_layout()
 plt.show()
 
 
-#%%
+#%%cSMOGN
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -99,7 +104,8 @@ y = data[target].to_numpy().astype(float)
 
 #%%
 # ---- relevance with distance kernel ----
-from imbami import DensityDistanceRelevance, cSMOGN
+from imbami import DensityDistanceRelevance
+from imbami import cSMOGN
 y_scaled = (y - y.min()) / (y.max() - y.min())
 
 dist_kernel = DensityDistanceRelevance()
@@ -148,7 +154,7 @@ plt.title("cSMOGN on housing.csv (numeric features only)")
 plt.legend()
 plt.tight_layout()
 plt.show()
-#%%
+#%%crbSMOGN
 import pandas as pd
 
 housing = pd.read_csv("data/housing.csv")
@@ -205,6 +211,70 @@ plt.xlabel("SalePrice")
 plt.ylabel("Number of samples")
 plt.title("crbSMOGN on housing.csv")
 plt.legend()
+plt.tight_layout()
+plt.show()
+
+# %%Compare all three
+plt.figure(figsize=(6,4))
+plt.hist(y_smogn, bins=40, histtype="step", color="red", linewidth=2, label="SMOGN")
+plt.hist(data[target], bins=40, alpha=0.6, label="original", color="C0")
+plt.hist(new_data[target], bins=40,
+         histtype="step", linewidth=2, label="cSMOGN", color="C1")
+plt.hist(new_data_crb[target], bins=40,
+         histtype="step", linewidth=2, label="crbSMOGN", color="C2")
+plt.xlabel("SalePrice")
+plt.ylabel("Number of samples")
+plt.title("cSMOGN vs crbSMOGN on housing.csv")
+plt.legend()
+plt.tight_layout()
+
+# %%
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1) define bins on the ORIGINAL target
+bin_edges = np.quantile(data[target], [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+bin_labels = ["very rare", "rare", "medium", "frequent", "v. frequ."]
+
+def bin_freq(df):
+    """Relative frequency of samples in each bin for a given dataset."""
+    binned = pd.cut(df[target],
+                    bins=bin_edges,
+                    labels=bin_labels,
+                    include_lowest=True)
+    return binned.value_counts().sort_index() / len(df)
+
+# 2) frequencies per method
+freq_smogn   = bin_freq(df_smogn)
+freq_csmogn = bin_freq(new_data)
+freq_crb    = bin_freq(new_data_crb)   # change name if your 3rd set is different
+
+# 3) choose desired distribution (here: original distribution)
+desired = freq_original = bin_freq(data)
+
+def norm_bin_error(freq):
+    """Normalized bin error: |freq - desired| / desired."""
+    return (freq - desired).abs()
+
+err_orig   = norm_bin_error(freq_smogn)
+err_csmogn = norm_bin_error(freq_csmogn)
+err_crb    = norm_bin_error(freq_crb)
+
+# 4) plot
+x = np.arange(len(bin_labels))
+
+plt.figure(figsize=(8, 3))
+
+plt.plot(x, err_orig.values,   "o-", linestyle=":", label="SMOGN")
+plt.plot(x, err_csmogn.values, "s-", linestyle=":", label="cSMOGN")
+plt.plot(x, err_crb.values,    "D-", linestyle=":", label="crbSMOGN")  
+
+plt.xticks(x, bin_labels)
+plt.xlabel("Sample frequency bin")
+plt.ylabel("Normalized bin error")
+plt.legend()
+plt.grid(True, axis="y", alpha=0.3)
 plt.tight_layout()
 plt.show()
 
