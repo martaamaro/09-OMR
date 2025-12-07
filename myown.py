@@ -81,7 +81,131 @@ plt.show()
 
 
 #%%
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1) Load data
+housing = pd.read_csv("data/housing.csv")
+
+# 2) Use only numeric features + target
+numeric_cols = ["LotArea", "GrLivArea", "OverallQual", "YearBuilt", "SalePrice"]
+data = housing[numeric_cols].dropna().copy()
+
+target = "SalePrice"
+y = data[target].to_numpy().astype(float)
 
 
+
+#%%
+# ---- relevance with distance kernel ----
+from imbami import DensityDistanceRelevance, cSMOGN
+y_scaled = (y - y.min()) / (y.max() - y.min())
+
+dist_kernel = DensityDistanceRelevance()
+dist_kernel.fit(
+    y_scaled,
+    emp_bandwidth_type="silverman",
+    rel_data=None,
+    rel_bandwidth_type="uniform",
+    rel_bandwidth_factor=1.0,
+)
+
+rel_raw = dist_kernel.eval(y_scaled, centered=True)
+rel_scaled = (rel_raw - rel_raw.min()) / (rel_raw.max() - rel_raw.min() + 1e-9)
+relevance_values = pd.Series(rel_scaled, index=data.index, name="relevance")
+
+#%%
+# ---- run cSMOGN ----
+sampler = cSMOGN(
+    data=data,
+    target_column=target,
+    relevance_values=relevance_values,
+)
+
+new_data = sampler.run_sampling(
+    oversample_rate=0.5,
+    undersample_rate=0.5,
+    knns=5,
+    num_bins=10,
+    allowed_bin_deviation=1,
+    noise_factor=0.01,
+    ignore_categorical_similarity=False,
+    enable_undersampling=True,
+)
+
+print("Original shape:", data.shape)
+print("After cSMOGN  :", new_data.shape)
+
+# %%
+# ---- visualize ----
+plt.figure(figsize=(6,4))
+plt.hist(data[target], bins=40, alpha=0.6, label="original")
+plt.hist(new_data[target], bins=40, histtype="step", linewidth=2, label="cSMOGN")
+plt.xlabel("SalePrice")
+plt.ylabel("Number of samples")
+plt.title("cSMOGN on housing.csv (numeric features only)")
+plt.legend()
+plt.tight_layout()
+plt.show()
+#%%
+import pandas as pd
+
+housing = pd.read_csv("data/housing.csv")
+
+numeric_cols = ["LotArea", "GrLivArea", "OverallQual", "YearBuilt", "SalePrice"]
+data = housing[numeric_cols].dropna().copy()
+
+target = "SalePrice"
+
+#%%
+from imbami import DensityRatioRelevance   # or from imbami.density_ratio_relevance import ...
+
+y = data[target].to_numpy().astype(float)
+y_scaled = np.log10(y)   # prices → log-scale
+
+ratio_kernel = DensityRatioRelevance()
+ratio_kernel.fit(
+    y_scaled,
+    rel_data=None
+)
+
+relevance_values = pd.Series(
+    ratio_kernel.eval(y_scaled),
+    index=data.index,
+)
+
+
+
+# %%
+from imbami import crbSMOGN
+
+sampler = crbSMOGN(data=data, target_column=target, relevance_values=relevance_values)
+new_data_crb = sampler.run_sampling(
+    min_acceptable_relevance=0.8,
+    max_acceptable_relevance=1.2,
+    num_bins=10,
+    allowed_bin_deviation=1,
+    noise_factor=0.01,
+    ignore_categorical_similarity=False,
+    enable_undersampling=True,
+)
+
+# %%
+import matplotlib.pyplot as plt
+
+bins = 40
+plt.figure(figsize=(6,4))
+
+plt.hist(data[target], bins=bins, alpha=0.6, label="original", density=False)
+plt.hist(new_data_crb[target], bins=bins,
+         histtype="step", linewidth=2, label="crbSMOGN")
+
+plt.xlabel("SalePrice")
+plt.ylabel("Number of samples")
+plt.title("crbSMOGN on housing.csv")
+plt.legend()
+plt.tight_layout()
+plt.show()
 
 # %%
